@@ -24,6 +24,10 @@ Without spoofed MAC (**original MAC** of your card is used): <br />
 ./wepAttack AA:BB:CC:DD:EE:FF 11 00:11:33:44:55:66
 ```
 
+# Additional tools
+- **scanWepNetworks** is simple script that invokes **airodump-ng** command <br />
+  to scan only for **WEP encrypted networks** (hit CTRL+C to stop the script)
+
 # Dependencies
 **Following script IS NOT dependent on any library, nor external sources.**<br />
 
