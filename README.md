@@ -56,7 +56,8 @@ It runs 3 processes in a **konsole** windows: <br />
 - **aircrack-ng** which is periodically checking if there are any **IVs** collected in **.cap** files
 - **aireplay-ng** (option -1) which is used for **fake authentication** so that Access Point thinks you're a client
 - **aireplay-ng** (option -3) which is used to **replay ARP packets**, so that Access Point generates new **IVs** that you can capture<br />
-  more about <a href="http://www.aircrack-ng.org/doku.php?id=arp-request_reinjection">ARP Request Replay Attack</a> 
+  more about <a href="http://www.aircrack-ng.org/doku.php?id=arp-request_reinjection">ARP Request Replay Attack</a>
+- script should create directory called **packetsLog** to store all the **.cap** files captured by **airodump-ng**. <br /> After successful crack you can clear it's contents.
 
 # Successfully cracked WEP KEY!
 If you manage to crack **WEP key** you should see the following: 
