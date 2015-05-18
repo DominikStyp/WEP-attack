@@ -47,6 +47,32 @@ If not type: <br />
 chmod +x ./wepAttack
 ```
 
+# How it works
+It runs 3 processes in a **konsole** windows: <br />
+- **aircrack-ng** which is periodically checking if there are any **IVs** collected in **.cap** files
+- **aireplay-ng** (option -1) which is used for **fake authentication** so that Access Point thinks you're a client
+- **aireplay-ng** (option -3) which is used to **replay ARP packets**, so that Access Point generates new **IVs** that you can capture<br />
+  more about <a href="http://www.aircrack-ng.org/doku.php?id=arp-request_reinjection">ARP Request Replay Attack</a> 
+
+# Successfully cracked WEP KEY!
+If you manage to crack **WEP key** you should see the following: 
+- Aircrack window should output something like
+```
+KEY FOUND! [ AB:CD:EF:AB:CD:12:34:56:78:90:AB:CD:EF ] 
+        Decrypted correctly: 100%
+```        
+- Script window should output something like:
+```
+!!!! KEY WAS FOUND !!!!
+---------- YOUR WEP KEY IS: ----------------
+ABCDEFABCD1234567890ABCDEF
+--------------------------------------------
+You have it also in file: /root/WEP-Attack/KEY_FOUND_00027255FFC0
+```
+- There should be also a file like this *KEY_FOUND_00027255FFC0* in current directory
+
+
+
 # DONATIONS
 Like my project ?   
 Want to help in future development, and adding new features ?   
