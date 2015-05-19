@@ -59,6 +59,38 @@ It runs 3 processes in a **konsole** windows: <br />
   more about <a href="http://www.aircrack-ng.org/doku.php?id=arp-request_reinjection">ARP Request Replay Attack</a>
 - script should create directory called **packetsLog** to store all the **.cap** files captured by **airodump-ng**. <br /> After successful crack you can clear it's contents.
 
+# Fragmentation or Chop Chop Attack
+I've also written a script that uses **Fragmentation** or **Chop Chop Attack** <br />
+You can find it in the same directory, and it's called **fragmentationOrChopChopAttack** <br />
+Usage of the script is very similar to the **wepAttack** <br />
+```
+./fragmentationOrChopChopAttack [BSSID] [CHANNEL] [[CHOP_CHOP_ATTACK]]
+```
+**[[CHOP_CHOP_ATTACK]]** should be **1** and it means that <a href="http://www.aircrack-ng.org/doku.php?id=korek_chopchop">Korek Chop Chop Attack</a> is gonna be used, <br /> 
+if you omit this parameter, or give it value other than **1** than <a href="http://www.aircrack-ng.org/doku.php?id=fragmentation">Fragmentation Attack</a> will be used instead.<br />
+Example: <br />
+```
+./fragmentationOrChopChopAttack AA:BB:CC:DD:EE:FF 11 1 # Korek Chop Chop
+./fragmentationOrChopChopAttack AA:BB:CC:DD:EE:FF 11 # Fragmentation Attack 
+```
+After successful attack script will store **WEP Key** in file **{BSSID_CLEAR}_WEP_KEY_FOUND_LOG**, <br />
+where **{BSSID_CLEAR}** is MAC address of the target access point without colons.
+
+# Additional Info
+Before you use this script make sure that your script has permissions to execute.<br />
+If not type: <br />
+```
+chmod +x ./wepAttack
+```
+**REMEMBER** If your first attack fails, and Access Point stops sending **IVs**, don't worry,<br />
+you can kill script and try again, because this kind of attack is like a lottery,<br />
+the more you try, the bigger win chance you have. **IVs** are generated randomly,<br />
+and sometimes you can crack WEP key in first 5000 **IVs**, but sometimes it takes much longer.<br />
+<br />
+If **WEP network** doesn't have any connected clients attack can fail.<br /> 
+So the best moment to attack is when any real client is connected.<br />
+You can check this using
+
 # Successfully cracked WEP KEY!
 If you manage to crack **WEP key** you should see the following: 
 - Aircrack window should output something like
