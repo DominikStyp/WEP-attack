@@ -101,10 +101,8 @@ konsole --hold --title "WEP-ATTACK: Aircrack-ng" --workdir $CURRENT_DIR -e /bin/
 # periodical checking if KEY_FOUND file exists
 while true; do
   if [[ -f "${KEY_FOUND_LOG}" ]]; then
-      kill -INT $(getKonsolePidByProcessName aireplay-ng)
-      kill -INT $(getKonsolePidByProcessName airodump-ng)
-      killall -INT aireplay-ng
-      killall -INT airodump-ng
+      killall aireplay-ng
+      killall airodump-ng
       echo "!!!! KEY WAS FOUND !!!!"
       echo "---------- YOUR WEP KEY IS: ----------------"
       echo $(cat ${KEY_FOUND_LOG})
